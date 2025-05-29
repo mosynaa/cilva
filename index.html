@@ -144,7 +144,7 @@
   // Stato dati inseriti: { codice: {qty: string, prezzo: string} }
   let datiInseriti = {};
 
-  // Carica CSV da GitHub (modifica questo URL con il tuo)
+  // Carica CSV da GitHub (https://raw.githubusercontent.com/mosynaa/cilva/refs/heads/main/catalogo.csv)
   async function caricaCSV(url) {
     return new Promise((resolve, reject) => {
       Papa.parse(url, {
