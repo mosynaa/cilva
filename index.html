@@ -70,25 +70,63 @@
       color: white;
     }
     td input {
-      width: 80%;
-      padding: 5px;
+      width: 60px;
+      padding: 4px;
       font-size: 14px;
       font-family: 'Poppins', sans-serif;
+      text-align: center;
     }
-    #cart {
-      margin-top: 30px;
+
+    /* Stili pop-up carrello */
+    #cartPopup {
+      position: fixed;
+      top: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 90%;
+      max-width: 700px;
       background: #e0f7fa;
       border: 2px solid #0077b6;
-      border-radius: 8px;
+      border-radius: 10px;
       padding: 15px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.3);
+      z-index: 1000;
+      display: none;
     }
-    #cart h2 {
+    #cartPopup h2 {
       color: #0077b6;
       margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
-    #cart table {
+    #cartPopup h2 button {
+      background: transparent;
+      color: #0077b6;
+      font-size: 22px;
+      padding: 0 8px;
+      border: none;
+      cursor: pointer;
+    }
+    #cartPopup table {
       background: white;
+      max-height: 300px;
+      overflow-y: auto;
+      display: block;
     }
+    #cartPopup table thead, #cartPopup table tbody tr {
+      display: table;
+      width: 100%;
+      table-layout: fixed;
+    }
+
+    /* Bottone apertura carrello */
+    #openCartBtn {
+      background-color: #ff8500;
+      margin-bottom: 15px;
+      font-weight: 600;
+    }
+
     @media (max-width: 600px) {
       input[type="text"] {
         width: 100%;
@@ -103,10 +141,36 @@
         width: 100%;
         margin: 0 0 10px 0;
       }
+      #cartPopup {
+        width: 95%;
+        top: 50px;
+      }
     }
   </style>
 </head>
 <body>
+  <!-- BOTTONE PER APRIRE IL CARRELLO -->
+  <button id="openCartBtn" onclick="toggleCart()">Mostra/Nascondi Carrello 🛒</button>
+
+  <!-- POPUP CARRELLO -->
+  <div id="cartPopup">
+    <h2>
+      Carrello
+      <button onclick="toggleCart()" aria-label="Chiudi carrello">&times;</button>
+    </h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Codice</th>
+          <th>Descrizione</th>
+          <th>Qtà</th>
+          <th>Prezzo</th>
+        </tr>
+      </thead>
+      <tbody id="cartBody"></tbody>
+    </table>
+  </div>
+
   <h1>Gestione Ordini</h1>
 
   <div class="client-name">
@@ -148,22 +212,6 @@
     </thead>
     <tbody id="tableBody"></tbody>
   </table>
-
-  <!-- Carrello -->
-  <div id="cart">
-    <h2>Carrello</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>Codice</th>
-          <th>Descrizione</th>
-          <th>Qtà</th>
-          <th>Prezzo</th>
-        </tr>
-      </thead>
-      <tbody id="cartBody"></tbody>
-    </table>
-  </div>
 
   <script>
     let catalogData = [];
@@ -211,7 +259,7 @@
         tableBody.appendChild(row);
       });
 
-      filterTable(); // per aggiornare subito la visibilità in base a eventuale filtro attivo
+      filterTable(); // aggiorna visibilità secondo filtro
       updateCart();
     }
 
@@ -240,34 +288,21 @@
       const qty = document.getElementById('extraQty').value.trim();
       const price = document.getElementById('extraPrice').value.trim();
       if (!desc) {
-        alert('Inserisci una descrizione per l\'articolo extra');
+        alert('Descrizione articolo extra obbligatoria.');
         return;
       }
-      extraData.unshift({ codice: '', descrizione: desc, qty: qty, prezzo: price }); // aggiungo in cima con unshift
-      renderTable();
+      extraData.push({ codice: '', descrizione: desc, qty: qty, prezzo: price });
       document.getElementById('extraDesc').value = '';
       document.getElementById('extraQty').value = '';
       document.getElementById('extraPrice').value = '';
-      updateCart();
-    }
-
-    function resetValues() {
-      catalogData.forEach(item => {
-        item.qty = '';
-        item.prezzo = '';
-      });
-      extraData = [];
       renderTable();
-      document.getElementById('noteField').value = '';
-      document.getElementById('clientName').value = '';
-      document.getElementById('searchInput').value = '';
-      updateCart();
     }
 
+    // Funzione filtro ricerca con mantenimento dati
     function filterTable() {
       const filter = document.getElementById('searchInput').value.toLowerCase();
-      const tableBody = document.getElementById('tableBody');
-      tableBody.querySelectorAll('tr').forEach(row => {
+      const tbody = document.getElementById('tableBody');
+      [...tbody.rows].forEach(row => {
         const descr = row.cells[1].textContent.toLowerCase();
         if (descr.includes(filter)) {
           row.style.display = '';
@@ -277,72 +312,124 @@
       });
     }
 
+    // Funzione per resettare tutti i dati
+    function resetValues() {
+      if (confirm('Sei sicuro di azzerare quantità e prezzi inseriti?')) {
+        extraData = [];
+        catalogData.forEach(item => {
+          item.qty = '';
+          item.prezzo = '';
+        });
+        document.getElementById('clientName').value = '';
+        document.getElementById('noteField').value = '';
+        renderTable();
+      }
+    }
+
+    // GENERAZIONE FILE EXCEL
+    function generateExcel() {
+      const wb = XLSX.utils.book_new();
+      const wsData = [];
+      const client = document.getElementById('clientName').value || 'Cliente';
+
+      // Intestazione e note
+      wsData.push([`Ordine di: ${client}`]);
+      wsData.push([`Note: ${document.getElementById('noteField').value || ''}`]);
+      wsData.push([]);
+      wsData.push(['Codice', 'Descrizione', 'Qtà', 'Prezzo']);
+
+      // Unisci extra + catalog con quantità > 0 o prezzo compilato
+      const combined = [...extraData, ...catalogData];
+      combined.forEach(item => {
+        const qty = item.qty.trim();
+        const prezzo = item.prezzo.trim();
+        if (qty || prezzo) {
+          wsData.push([
+            item.codice || '',
+            item.descrizione || '',
+            qty || 'CT',
+            prezzo || 'P.P.'
+          ]);
+        }
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      XLSX.utils.book_append_sheet(wb, ws, "Ordine");
+
+      XLSX.writeFile(wb, `${client}_ordine.xlsx`);
+    }
+
+    // --- Carrello: mostra in popup gli articoli con quantità > 0 ---
     function updateCart() {
       const cartBody = document.getElementById('cartBody');
       cartBody.innerHTML = '';
 
-      // Extra articoli con quantità > 0 o non vuota
-      extraData.forEach(item => {
-        if (item.qty.trim() !== '' && item.qty.trim() !== '0') {
+      const combined = [...extraData, ...catalogData];
+      combined.forEach((item, idx) => {
+        if (item.qty && item.qty.trim() !== '' && item.qty.trim() !== '0') {
           const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${item.codice || ''}</td>
-            <td>${item.descrizione || ''}</td>
-            <td>${item.qty}</td>
-            <td>${item.prezzo || 'P.P.'}</td>
-          `;
-          cartBody.appendChild(tr);
-        }
-      });
 
-      // Catalogo articoli con quantità > 0 o non vuota
-      catalogData.forEach(item => {
-        if (item.qty.trim() !== '' && item.qty.trim() !== '0') {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${item.codice || ''}</td>
-            <td>${item.descrizione || ''}</td>
-            <td>${item.qty}</td>
-            <td>${item.prezzo || 'P.P.'}</td>
-          `;
+          // Codice e descrizione sono solo testo
+          const codiceTd = document.createElement('td');
+          codiceTd.textContent = item.codice || '';
+          tr.appendChild(codiceTd);
+
+          const descTd = document.createElement('td');
+          descTd.textContent = item.descrizione || '';
+          tr.appendChild(descTd);
+
+          // Qtà input modificabile
+          const qtyTd = document.createElement('td');
+          const qtyInput = document.createElement('input');
+          qtyInput.type = 'text';
+          qtyInput.value = item.qty;
+          qtyInput.size = 4;
+          qtyInput.onchange = (e) => {
+            const val = e.target.value;
+            if (idx < extraData.length) {
+              extraData[idx].qty = val;
+            } else {
+              catalogData[idx - extraData.length].qty = val;
+            }
+            renderTable();
+          };
+          qtyTd.appendChild(qtyInput);
+          tr.appendChild(qtyTd);
+
+          // Prezzo input modificabile
+          const priceTd = document.createElement('td');
+          const priceInput = document.createElement('input');
+          priceInput.type = 'text';
+          priceInput.value = item.prezzo;
+          priceInput.size = 6;
+          priceInput.onchange = (e) => {
+            const val = e.target.value;
+            if (idx < extraData.length) {
+              extraData[idx].prezzo = val;
+            } else {
+              catalogData[idx - extraData.length].prezzo = val;
+            }
+            renderTable();
+          };
+          priceTd.appendChild(priceInput);
+          tr.appendChild(priceTd);
+
           cartBody.appendChild(tr);
         }
       });
     }
 
-    function generateExcel() {
-      const wb = XLSX.utils.book_new();
-
-      const clientName = document.getElementById('clientName').value.trim();
-      const note = document.getElementById('noteField').value.trim();
-
-      const wsData = [
-        ['Cliente:', clientName],
-        ['Note:', note],
-        [],
-        ['Codice', 'Descrizione', 'Qtà', 'Prezzo']
-      ];
-
-      // Unisco dati extra e catalogo per esportazione, includendo solo quantità > 0 o non vuote
-      const allItems = [...extraData, ...catalogData].filter(item => item.qty.trim() !== '' && item.qty.trim() !== '0');
-
-      allItems.forEach(item => {
-        wsData.push([
-          item.codice || '',
-          item.descrizione || '',
-          item.qty || '',
-          item.prezzo || 'P.P.'
-        ]);
-      });
-
-      const ws = XLSX.utils.aoa_to_sheet(wsData);
-      XLSX.utils.book_append_sheet(wb, ws, 'Ordine');
-
-      const fileName = clientName ? `Ordine_${clientName}.xlsx` : 'Ordine.xlsx';
-      XLSX.writeFile(wb, fileName);
+    // Toggle visibilità popup carrello
+    function toggleCart() {
+      const cart = document.getElementById('cartPopup');
+      if (cart.style.display === 'block') {
+        cart.style.display = 'none';
+      } else {
+        updateCart();
+        cart.style.display = 'block';
+      }
     }
 
-    // Caricamento e inizializzazione
     loadCSV();
   </script>
 </body>
