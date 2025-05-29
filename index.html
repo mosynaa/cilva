@@ -361,63 +361,46 @@
 
     // --- Carrello: mostra in popup gli articoli con quantità > 0 ---
     function updateCart() {
-      const cartBody = document.getElementById('cartBody');
-      cartBody.innerHTML = '';
+  const cartBody = document.getElementById('cartBody');
+  cartBody.innerHTML = '';
 
-      const combined = [...extraData, ...catalogData];
-      combined.forEach((item, idx) => {
-        if (item.qty && item.qty.trim() !== '' && item.qty.trim() !== '0') {
-          const tr = document.createElement('tr');
+  const combined = [...extraData, ...catalogData];
+  combined.forEach((item, idx) => {
+    if (item.qty && item.qty.trim() !== '' && item.qty.trim() !== '0') {
+      const tr = document.createElement('tr');
 
-          // Codice e descrizione sono solo testo
-          const codiceTd = document.createElement('td');
-          codiceTd.textContent = item.codice || '';
-          tr.appendChild(codiceTd);
+      // Codice e descrizione solo testo
+      const codiceTd = document.createElement('td');
+      codiceTd.textContent = item.codice || '';
+      tr.appendChild(codiceTd);
 
-          const descTd = document.createElement('td');
-          descTd.textContent = item.descrizione || '';
-          tr.appendChild(descTd);
+      const descTd = document.createElement('td');
+      descTd.textContent = item.descrizione || '';
+      tr.appendChild(descTd);
 
-          // Qtà input modificabile
-          const qtyTd = document.createElement('td');
-          const qtyInput = document.createElement('input');
-          qtyInput.type = 'text';
-          qtyInput.value = item.qty;
-          qtyInput.size = 4;
-          qtyInput.onchange = (e) => {
-            const val = e.target.value;
-            if (idx < extraData.length) {
-              extraData[idx].qty = val;
-            } else {
-              catalogData[idx - extraData.length].qty = val;
-            }
-            renderTable();
-          };
-          qtyTd.appendChild(qtyInput);
-          tr.appendChild(qtyTd);
-
-          // Prezzo input modificabile
-          const priceTd = document.createElement('td');
-          const priceInput = document.createElement('input');
-          priceInput.type = 'text';
-          priceInput.value = item.prezzo;
-          priceInput.size = 6;
-          priceInput.onchange = (e) => {
-            const val = e.target.value;
-            if (idx < extraData.length) {
-              extraData[idx].prezzo = val;
-            } else {
-              catalogData[idx - extraData.length].prezzo = val;
-            }
-            renderTable();
-          };
-          priceTd.appendChild(priceInput);
-          tr.appendChild(priceTd);
-
-          cartBody.appendChild(tr);
+      // Qtà input modificabile
+      const qtyTd = document.createElement('td');
+      const qtyInput = document.createElement('input');
+      qtyInput.type = 'text';
+      qtyInput.value = item.qty;
+      qtyInput.size = 4;
+      qtyInput.onchange = (e) => {
+        const val = e.target.value;
+        if (idx < extraData.length) {
+          extraData[idx].qty = val;
+        } else {
+          catalogData[idx - extraData.length].qty = val;
         }
-      });
+        renderTable();
+      };
+      qtyTd.appendChild(qtyInput);
+      tr.appendChild(qtyTd);
+
+      cartBody.appendChild(tr);
     }
+  });
+}
+
 
     // Toggle visibilità popup carrello
     function toggleCart() {
