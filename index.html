@@ -75,20 +75,6 @@
       font-size: 14px;
       font-family: 'Poppins', sans-serif;
     }
-    #cart {
-      margin-top: 30px;
-      background: #e0f7fa;
-      border: 2px solid #0077b6;
-      border-radius: 8px;
-      padding: 15px;
-    }
-    #cart h2 {
-      color: #0077b6;
-      margin-bottom: 10px;
-    }
-    #cart table {
-      background: white;
-    }
     @media (max-width: 600px) {
       input[type="text"] {
         width: 100%;
@@ -103,6 +89,61 @@
         width: 100%;
         margin: 0 0 10px 0;
       }
+    }
+    /* Popup Carrello */
+    #cartModal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0; top: 0; width: 100%; height: 100%;
+      overflow: auto;
+      background-color: rgba(0,0,0,0.5);
+    }
+    #cartModalContent {
+      background-color: #e0f7fa;
+      margin: 5% auto;
+      padding: 20px;
+      border: 2px solid #0077b6;
+      border-radius: 8px;
+      max-width: 600px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+      position: relative;
+    }
+    #cartModalContent h2 {
+      color: #0077b6;
+      margin-top: 0;
+      margin-bottom: 15px;
+      text-align: center;
+    }
+    #cartModalContent table {
+      width: 100%;
+      background: white;
+      border-collapse: collapse;
+    }
+    #cartModalContent th, #cartModalContent td {
+      padding: 10px;
+      border: 1px solid #ddd;
+      text-align: left;
+    }
+    #cartModalContent th {
+      background-color: #ff8500;
+      color: white;
+    }
+    #cartCloseBtn {
+      position: absolute;
+      top: 10px;
+      right: 15px;
+      background: #ff4d4d;
+      border: none;
+      color: white;
+      font-weight: 700;
+      font-size: 18px;
+      cursor: pointer;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      line-height: 25px;
+      text-align: center;
     }
   </style>
 </head>
@@ -135,6 +176,7 @@
   <div class="top-buttons">
     <button onclick="generateExcel()">Genera Excel</button>
     <button onclick="resetValues()">Azzera Valori</button>
+    <button onclick="openCart()">Mostra Carrello</button>
   </div>
 
   <table id="orderTable">
@@ -149,20 +191,22 @@
     <tbody id="tableBody"></tbody>
   </table>
 
-  <!-- Carrello -->
-  <div id="cart">
-    <h2>Carrello</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>Codice</th>
-          <th>Descrizione</th>
-          <th>Qtà</th>
-          <th>Prezzo</th>
-        </tr>
-      </thead>
-      <tbody id="cartBody"></tbody>
-    </table>
+  <!-- Popup Carrello -->
+  <div id="cartModal">
+    <div id="cartModalContent">
+      <button id="cartCloseBtn" onclick="closeCart()" title="Chiudi">&times;</button>
+      <h2>Carrello</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Codice</th>
+            <th>Descrizione</th>
+            <th>Qtà</th>
+          </tr>
+        </thead>
+        <tbody id="cartBody"></tbody>
+      </table>
+    </div>
   </div>
 
   <script>
@@ -185,7 +229,7 @@
       const tableBody = document.getElementById('tableBody');
       tableBody.innerHTML = '';
 
-      // Prima articoli extra
+      // Articoli extra
       extraData.forEach((item, index) => {
         const row = document.createElement('tr');
         row.dataset.extraIndex = index;
@@ -198,7 +242,7 @@
         tableBody.appendChild(row);
       });
 
-      // Poi articoli catalogo
+      // Articoli catalogo
       catalogData.forEach((item, index) => {
         const row = document.createElement('tr');
         row.dataset.catalogIndex = index;
@@ -211,7 +255,7 @@
         tableBody.appendChild(row);
       });
 
-      filterTable(); // per aggiornare subito la visibilità in base a eventuale filtro attivo
+      filterTable();
       updateCart();
     }
 
@@ -222,128 +266,26 @@
     }
     function updateExtraPrice(index, value) {
       extraData[index].prezzo = value;
-      updateCart();
     }
 
-    // Aggiornamento dati catalogo
+    // Aggiornamento dati articoli catalogo
     function updateCatalogQty(index, value) {
       catalogData[index].qty = value;
       updateCart();
     }
     function updateCatalogPrice(index, value) {
       catalogData[index].prezzo = value;
-      updateCart();
     }
 
+    // Aggiunta articolo extra
     function addExtraArticle() {
       const desc = document.getElementById('extraDesc').value.trim();
       const qty = document.getElementById('extraQty').value.trim();
-      const price = document.getElementById('extraPrice').value.trim();
+      const prezzo = document.getElementById('extraPrice').value.trim();
       if (!desc) {
-        alert('Inserisci una descrizione per l\'articolo extra');
+        alert('Inserisci la descrizione dell\'articolo extra.');
         return;
       }
-      extraData.unshift({ codice: '', descrizione: desc, qty: qty, prezzo: price }); // aggiungo in cima con unshift
-      renderTable();
+      extraData.push({ codice: '', descrizione: desc, qty: qty || '', prezzo: prezzo || '' });
       document.getElementById('extraDesc').value = '';
       document.getElementById('extraQty').value = '';
-      document.getElementById('extraPrice').value = '';
-      updateCart();
-    }
-
-    function resetValues() {
-      catalogData.forEach(item => {
-        item.qty = '';
-        item.prezzo = '';
-      });
-      extraData = [];
-      renderTable();
-      document.getElementById('noteField').value = '';
-      document.getElementById('clientName').value = '';
-      document.getElementById('searchInput').value = '';
-      updateCart();
-    }
-
-    function filterTable() {
-      const filter = document.getElementById('searchInput').value.toLowerCase();
-      const tableBody = document.getElementById('tableBody');
-      tableBody.querySelectorAll('tr').forEach(row => {
-        const descr = row.cells[1].textContent.toLowerCase();
-        if (descr.includes(filter)) {
-          row.style.display = '';
-        } else {
-          row.style.display = 'none';
-        }
-      });
-    }
-
-    function updateCart() {
-      const cartBody = document.getElementById('cartBody');
-      cartBody.innerHTML = '';
-
-      // Extra articoli con quantità > 0 o non vuota
-      extraData.forEach(item => {
-        if (item.qty.trim() !== '' && item.qty.trim() !== '0') {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${item.codice || ''}</td>
-            <td>${item.descrizione || ''}</td>
-            <td>${item.qty}</td>
-            <td>${item.prezzo || 'P.P.'}</td>
-          `;
-          cartBody.appendChild(tr);
-        }
-      });
-
-      // Catalogo articoli con quantità > 0 o non vuota
-      catalogData.forEach(item => {
-        if (item.qty.trim() !== '' && item.qty.trim() !== '0') {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${item.codice || ''}</td>
-            <td>${item.descrizione || ''}</td>
-            <td>${item.qty}</td>
-            <td>${item.prezzo || 'P.P.'}</td>
-          `;
-          cartBody.appendChild(tr);
-        }
-      });
-    }
-
-    function generateExcel() {
-      const wb = XLSX.utils.book_new();
-
-      const clientName = document.getElementById('clientName').value.trim();
-      const note = document.getElementById('noteField').value.trim();
-
-      const wsData = [
-        ['Cliente:', clientName],
-        ['Note:', note],
-        [],
-        ['Codice', 'Descrizione', 'Qtà', 'Prezzo']
-      ];
-
-      // Unisco dati extra e catalogo per esportazione, includendo solo quantità > 0 o non vuote
-      const allItems = [...extraData, ...catalogData].filter(item => item.qty.trim() !== '' && item.qty.trim() !== '0');
-
-      allItems.forEach(item => {
-        wsData.push([
-          item.codice || '',
-          item.descrizione || '',
-          item.qty || '',
-          item.prezzo || 'P.P.'
-        ]);
-      });
-
-      const ws = XLSX.utils.aoa_to_sheet(wsData);
-      XLSX.utils.book_append_sheet(wb, ws, 'Ordine');
-
-      const fileName = clientName ? `Ordine_${clientName}.xlsx` : 'Ordine.xlsx';
-      XLSX.writeFile(wb, fileName);
-    }
-
-    // Caricamento e inizializzazione
-    loadCSV();
-  </script>
-</body>
-</html>
