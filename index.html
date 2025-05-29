@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Catalogo Ordini</title>
+
+<!-- Font Poppins -->
+<link href="https://fonts.googleapis.com/css2?family=Poppins&display=swap" rel="stylesheet" />
+
+<style>
+  body {
+    font-family: 'Poppins', sans-serif;
+    background: #F2F2F2;
+    margin: 0; padding: 20px;
+    color: #333;
+  }
+  h1 {
+    color: #007BFF;
+    text-align: center;
+    margin-bottom: 15px;
+  }
+  .top-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 15px;
+  }
+  input[type=text], select, textarea {
+    font-family: 'Poppins', sans-serif;
+    font-size: 1rem;
+    padding: 8px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+  }
+  input[type=text] {
+    flex: 1 1 200px;
+  }
+  select {
+    background: white;
+    color: #333;
+  }
+  textarea {
+    width: 100%;
+    min-height: 60px;
+    margin-top: 10px;
+    resize: vertical;
+  }
+  button {
+    background-color: #007BFF;
+    border: none;
+    color: white;
+    padding: 10px 20px;
+    font-weight: 600;
+    font-size: 1rem;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
+  button:hover {
+    background-color: #0056b3;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    margin-top: 15px;
+  }
+  th, td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+  }
+  th {
+    background-color: #007BFF;
+    color: white;
+  }
+  input.qty-input {
+    width: 80px;
+  }
+  input.price-input {
+    width: 90px;
+  }
+  /* Responsive */
+  @media (max-width: 600px) {
+    .top-bar {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    input[type=text], select, button {
+      flex: none;
+      width: 100%;
+    }
+    table, th, td {
+      font-size: 0.9rem;
+    }
+  }
+</style>
+
+<!-- Librerie -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+</head>
+<body>
+
+<h1>Catalogo Ordini</h1>
+
+<div class="top-bar">
+  <input type="text" id="nomeCliente" placeholder="Nome Cliente" />
+  <select id="categoriaFiltro"><option value="tutte">Tutte le categorie</option></select>
+  <input type="text" id="cercaProdotto" placeholder="Cerca prodotto..." />
+  <button id="generaXLSBtn">Genera Excel</button>
+</div>
+
+<table id="tabellaProdotti" aria-label="Tabella prodotti">
+  <thead>
+    <tr>
+      <th>Codice</th>
+      <th>Descrizione</th>
+      <th>Quantità</th>
+      <th>Prezzo</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<label for="noteCliente">Note ordine:</label>
+<textarea id="noteCliente" placeholder="Inserisci eventuali note..."></textarea>
+
+<script>
+(async () => {
+  const tabellaBody = document.querySelector('#tabellaProdotti tbody');
+  const categoriaFiltro = document.getElementById('categoriaFiltro');
+  const cercaProdotto = document.getElementById('cercaProdotto');
+  const nomeCliente = document.getElementById('nomeCliente');
+  const noteCliente = document.getElementById('noteCliente');
+  const generaXLSBtn = document.getElementById('generaXLSBtn');
+
+  let prodotti = [];
+  let categorie = new Set();
+
+  // Stato dati inseriti: { codice: {qty: string, prezzo: string} }
+  let datiInseriti = {};
+
+  // Carica CSV da GitHub (modifica questo URL con il tuo)
+  async function caricaCSV(url) {
+    return new Promise((resolve, reject) => {
+      Papa.parse(url, {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => resolve(results.data),
+        error: (err) => reject(err)
+      });
+    });
+  }
+
+  // Aggiorna datiInseriti quando cambiano gli input per mantenere dati durante filtri
+  function aggiornaDatiInseriti() {
+    const righe = tabellaBody.querySelectorAll('tr');
+    righe.forEach(riga => {
+      const codice = riga.cells[0].textContent;
+      const qtyInput = riga.cells[2].querySelector('input').value.trim();
+      const prezzoInput = riga.cells[3].querySelector('input').value.trim();
+      datiInseriti[codice] = {
+        qty: qtyInput,
+        prezzo: prezzoInput
+      };
+    });
+  }
+
+  // Crea la tabella filtrando prodotti e ripristinando dati inseriti
+  function mostraProdotti() {
+    const catSelezionata = categoriaFiltro.value.toLowerCase();
+    const ricerca = cercaProdotto.value.toLowerCase();
+
+    aggiornaDatiInseriti();
+
+    tabellaBody.innerHTML = '';
+
+    prodotti.forEach(({ codice, descrizione, categoria, prezzo }) => {
+      if ((catSelezionata === 'tutte' || categoria.toLowerCase() === catSelezionata) &&
+          (descrizione.toLowerCase().includes(ricerca) || codice.toLowerCase().includes(ricerca))) {
+
+        const riga = document.createElement('tr');
+
+        // Codice
+        const tdCodice = document.createElement('td');
+        tdCodice.textContent = codice;
+        riga.appendChild(tdCodice);
+
+        // Descrizione
+        const tdDesc = document.createElement('td');
+        tdDesc.textContent = descrizione;
+        riga.appendChild(tdDesc);
+
+        // Quantità input con placeholder "0 ct"
+        const tdQty = document.createElement('td');
+        const inputQty = document.createElement('input');
+        inputQty.type = 'text';
+        inputQty.className = 'qty-input';
+        inputQty.placeholder = '0 ct';
+
+        // Ripristina valore se presente
+        inputQty.value = (datiInseriti[codice] && datiInseriti[codice].qty) ? datiInseriti[codice].qty : '';
+
+        // Aggiorna dati inseriti al cambiamento
+        inputQty.addEventListener('input', () => {
+          datiInseriti[codice] = datiInseriti[codice] || {};
+          datiInseriti[codice].qty = inputQty.value.trim();
+        });
+
+        tdQty.appendChild(inputQty);
+        riga.appendChild(tdQty);
+
+        // Prezzo input con placeholder "P.P."
+        const tdPrezzo = document.createElement('td');
+        const inputPrezzo = document.createElement('input');
+        inputPrezzo.type = 'text';
+        inputPrezzo.className = 'price-input';
+        inputPrezzo.placeholder = prezzo ? prezzo : 'P.P.';
+
+        // Ripristina valore se presente
+        inputPrezzo.value = (datiInseriti[codice] && datiInseriti[codice].prezzo) ? datiInseriti[codice].prezzo : '';
+
+        inputPrezzo.addEventListener('input', () => {
+          datiInseriti[codice] = datiInseriti[codice] || {};
+          datiInseriti[codice].prezzo = inputPrezzo.value.trim();
+        });
+
+        tdPrezzo.appendChild(inputPrezzo);
+        riga.appendChild(tdPrezzo);
+
+        tabellaBody.appendChild(riga);
+      }
+    });
+  }
+
+  // Popola filtro categorie
+  function popolaCategorie() {
+    categoriaFiltro.innerHTML = '<option value="tutte">Tutte le categorie</option>';
+    Array.from(categorie).sort().forEach(cat => {
+      const opt = document.createElement('option');
+      opt.value = cat.toLowerCase();
+      opt.textContent = cat;
+      categoriaFiltro.appendChild(opt);
+    });
+  }
+
+  // Genera file Excel .xls con dati inseriti
+  function generaExcel() {
+    aggiornaDatiInseriti();
+
+    // Crea dati per Excel
+function generaExcel() {
+  aggiornaDatiInseriti();
+
+  // Intestazioni colonne
+  const datiExcel = [
+    ['Codice', 'Descrizione', 'Quantità', 'Prezzo', 'Categoria']
+  ];
+
+  // Aggiungo solo prodotti con quantità o prezzo compilati (o entrambi)
+  prodotti.forEach(({ codice, descrizione, categoria, prezzo }) => {
+    const dati = datiInseriti[codice] || {};
+    let qty = dati.qty && dati.qty.trim() !== '' ? dati.qty.trim() : '0 ct';
+    let pr = dati.prezzo && dati.prezzo.trim() !== '' ? dati.prezzo.trim() : (prezzo ? prezzo : 'P.P.');
+    if(qty !== '0 ct' || pr !== 'P.P.') {
+      datiExcel.push([codice, descrizione, qty, pr, categoria]);
+    }
+  });
+
+  if (datiExcel.length === 1) {
+    alert('Nessun dato inserito da esportare.');
+    return;
+  }
+
+  // Aggiungo nome cliente e note come righe separate in fondo
+  datiExcel.push([]);
+  datiExcel.push(['Nome Cliente:', nomeCliente.value.trim()]);
+  datiExcel.push(['Note:', noteCliente.value.trim()]);
+
+  // Creo workbook
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(datiExcel);
+  XLSX.utils.book_append_sheet(wb, ws, 'Ordine');
+
+  // Salvo file con nome cliente o data
+  const nomeFile = (nomeCliente.value.trim() || 'ordine') + '_' + new Date().toISOString().slice(0,10) + '.xlsx';
+  XLSX.writeFile(wb, nomeFile);
+}
+
+generaXLSBtn.addEventListener('click', generaExcel);
+
+// Caricamento CSV e setup iniziale
+try {
+  const urlCSV = 'https://raw.githubusercontent.com/mosynaa/ordinecil/main/catalogo.csv';
+  prodotti = await caricaCSV(urlCSV);
+  // Raccolgo categorie uniche
+  prodotti.forEach(p => {
+    if(p.categoria) categorie.add(p.categoria.trim());
+  });
+  popolaCategorie();
+  mostraProdotti();
+} catch(e) {
+  alert('Errore caricamento catalogo CSV: ' + e.message);
+}
+
+// Eventi filtro/ricerca
+categoriaFiltro.addEventListener('change', mostraProdotti);
+cercaProdotto.addEventListener('input', mostraProdotti);
+
+})();
+</script>
+
+</body>
+</html>
