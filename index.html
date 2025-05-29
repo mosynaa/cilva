@@ -196,7 +196,6 @@
   </div>
 
   <div class="top-buttons">
-    <button onclick="generateExcel()">Genera Excel</button>
     <button onclick="resetValues()">Azzera Valori</button>
   </div>
 
@@ -325,11 +324,7 @@
       }
     }
 
-    // GENERAZIONE FILE EXCEL
-    function generateExcel() {
-      const wb = XLSX.utils.book_new();
-      const wsData = [];
-      const client = document.getElementById('clientName').value || 'Cliente';
+    
 
       // Intestazione e note
       wsData.push([`Ordine di: ${client}`]);
